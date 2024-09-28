@@ -1,4 +1,10 @@
 #include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
+
+
 // Instruction Codes
 
 #define ADD_operation 1
@@ -7,40 +13,80 @@
 #define STORE_operation 4
 
 // Registers and Memory Arrays
-int registerAdd = 0;
-int registerSub = 0;
-int registerLoad = 0;
-int memory[100];
+int dataMemory[100];
+int memory[] = {333, 122, 120, 215, 205};
+int PC;
+int ACC;
+int IR;
+int statusRegister;
 
+// void -> void
+// set all data memory elements to 0;
+void initialize_dataMemory() {
+	for (int i=0; i < sizeof(dataMemory); i++) {
+		dataMemory[i] = i;
+	}
+}
+
+// void -> int
+// Fetch Instructions from memory
+int fetchInstruction() {
+	return memory[PC];
+}
+
+// int -> int
+// Get the address of the instruction
+int get_address(int n) {
+	int temp = 0;
+	int factor = 1;
+
+	while (n / 10 != 0) {
+		int m = n % 10;
+		n /= 10;
+		temp += factor * m;
+		factor *= 10;
+	}
+	return temp;
+}
+
+// int -> int
+// Get the opcode of the instruction
+int get_opcode(int instruction) {
+	int first = instruction;
+	while (first >= 10) {
+		first = first / 10;
+	}
+	return first;
+}
 
 // execute based on operation code
-void executeInstruction(int opcode, int operand1, int operand2) {
+void executeInstruction(int instruction) {
+	int opcode = get_opcode(instruction);
+	int address = get_address(instruction);
+	int prev;
+
 	switch(opcode) {
 		case ADD_operation:
 			// perform addition
-			registerAdd = operand1 + operand2;
-			printf("Adding: %d + %d = %d\n", operand1, operand2, registerAdd);
+			prev = ACC;
+			ACC = prev + dataMemory[address];
+			printf("Adding: %d + %d = %d\n", prev, dataMemory[address], ACC);
 			break;
 		case SUB_operation:
 			// perform substraction
-			registerSub = operand1 - operand2;
-			printf("Subtracting: %d - %d = %d\n", operand1, operand2, registerSub);
+			prev = ACC;
+			ACC = prev - dataMemory[address];
+			printf("Subtracting: %d - %d = %d\n", prev, dataMemory[address], ACC);
 			break;
 		case LOAD_operation:
 			// perform loading
-			if (operand1 >= 0 && operand1 <= 100) {
-				registerLoad = memory[operand1];
-			} else {
-				printf("Invalid operand1 value. Please keep operand1 between 0 and 100.\n");
-			}
+			ACC = dataMemory[address];
+			printf("Loading data in ACC: %d -> %d\n", dataMemory[address], ACC);
 			break;
 		case STORE_operation:
 			// perform storing
-			if (operand1 >= 0 && operand1 <= 100) {
-				memory[operand1] = registerLoad;
-			} else {
-				printf("Invalid operand1 value. Please keep operand1 between 0 and 100.\n");
-			}
+			dataMemory[address] = ACC;
+			printf("Storing data into memory from ACC: %d -> %d\n", ACC, dataMemory[address]);
 			break;
 		default:
 			// Handle undefined/invalid opcodes
@@ -50,20 +96,12 @@ void executeInstruction(int opcode, int operand1, int operand2) {
 }
 
 int main() {
-	memory[23] = 17;
-	executeInstruction(1, 10, 5);
-	printf("10 + 5 = %d\n", registerAdd);
-
-	executeInstruction(2, 10, 7);
-	printf("10 - 7 = %d\n", registerSub);
-
-	executeInstruction(3, 23, 0);
-	printf("Loading value from memory to registerLoad: %d\n", registerLoad);
-
-	executeInstruction(4, 24, 0);
-	printf("Storing registerLoad value, %d, into memory[24]\n.", registerLoad);
-	printf("Value of memory[24] is: %d\n", memory[24]);
-
-	executeInstruction(5, 2, 2);
+	initialize_dataMemory();
+	PC = 0;
+	while (PC < sizeof(memory) / sizeof(memory[0])) {
+		IR = fetchInstruction();
+		PC++;
+		executeInstruction(IR);
+	}
 	return 0;
 }
