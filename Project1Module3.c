@@ -18,7 +18,42 @@ int memory[] = {333, 122, 120, 215, 205};
 int PC;
 int ACC;
 int IR;
+int savedPC;
+int savedACC;
+int savedIR;
 int statusRegister;
+int interruptFlag = 0; // flag to signal the interrupt
+
+
+// void -> void
+// interrupt handler
+void interruptHandler() {
+	savedPC = PC;
+	savedACC = ACC;
+	savedIR = IR;
+	printf("Saving CPU status\n");
+
+	printf("Interrupt is being handled.\n");
+	sleep(1);
+
+	PC = savedPC;
+	ACC = savedACC;
+	IR = savedIR;
+	printf("Restoring CPU status\n");
+
+	interruptFlag = 0;
+	printf("Interrupt handling complete!\n");
+}
+
+// int -> void
+// Check for Interrupt Signals.
+void checkForInterrupt(int signal) {
+	interruptFlag = 1;
+	if (interruptFlag) {
+		interruptHandler();
+		alarm(2);
+	}
+}
 
 // void -> void
 // set all data memory elements to 0;
@@ -98,10 +133,17 @@ void executeInstruction(int instruction) {
 int main() {
 	initialize_dataMemory();
 	PC = 0;
+
+	signal(SIGALRM, checkForInterrupt);
+	alarm(2);
+
 	while (PC < sizeof(memory) / sizeof(memory[0])) {
-		IR = fetchInstruction();
-		PC++;
-		executeInstruction(IR);
+		if (!interruptFlag) {
+			IR = fetchInstruction();
+			PC++;
+			executeInstruction(IR);
+			sleep(1);
+		}
 	}
 	return 0;
 }
