@@ -5,6 +5,8 @@
 #include <time.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 // Instruction Codes
 #define ADD_operation 1
@@ -28,6 +30,11 @@ int savedACC;
 int savedIR;
 int statusRegister;
 int interruptFlag = 0; // flag to signal the interrupt
+
+//DMA Status
+#define DMA_READY 0
+#define DMA_BUSY 1
+#define DMA_COMPLETE 2
 
 typedef struct {
 	int* source;
@@ -80,13 +87,18 @@ void* dmaTransfer(void* args) {
 void initiateDMA(int* source, int* destination, int size) {
 	// CPU initiates DMA transfer
 	printf("Initiating DMA transfer.\n");
-	parametersDMA params = {source, destination, size};
+
+	parametersDMA* params = (parametersDMA*)malloc(sizeof(parametersDMA));
+    params->source = source;
+    params->destination = destination;
+    params->size = size;
 
 	pthread_t dmaThread;
-	pthread_create(&dmaThread, NULL, dmaTransfer, &params);
+	pthread_create(&dmaThread, NULL, dmaTransfer, params);
+	
 	// CPU can continue with other tasks while transfer happens
-	//pthread_join(dmaThread, NULL);
-
+	pthread_detach(dmaThread);
+	//free(params);
 }
 
 // void -> int
@@ -177,9 +189,10 @@ int getFromCacheL2(int address){
         for (int i = 0; i < 20; i++){
         if (cacheTagsl1[i] == address)
         {
-        return cacheLevel1[i];
+        return cacheLevel2[i];
         }
     }
+	return -1;
 }
 
 //Write to memory
