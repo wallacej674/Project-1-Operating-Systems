@@ -4,17 +4,18 @@
 #include <stdlib.h>
 #include <time.h>
 #include <pthread.h>
-
+#include <stdbool.h>
 
 // Instruction Codes
-
 #define ADD_operation 1
 #define SUB_operation 2
 #define LOAD_operation 3
 #define STORE_operation 4
 
 // Registers and Memory Arrays
-int dataMemory[100];
+int RAM[100];
+int cacheLevel1[10], cacheLevel2[20];
+int cacheTagsl1[10],cacheTagsl2[20];
 int memory[] = {333, 122, 120, 215, 205};
 int source[] = {1, 2, 3, 4, 5};
 int destination[5] = {0};
@@ -83,16 +84,9 @@ void initiateDMA(int* source, int* destination, int size) {
 
 	pthread_t dmaThread;
 	pthread_create(&dmaThread, NULL, dmaTransfer, &params);
-	pthread_detach(dmaThread);
 	// CPU can continue with other tasks while transfer happens
-}
+	//pthread_join(dmaThread, NULL);
 
-// void -> void
-// set all data memory elements to 0;
-void initialize_dataMemory() {
-	for (int i=0; i < sizeof(dataMemory); i++) {
-		dataMemory[i] = i;
-	}
 }
 
 // void -> int
@@ -126,6 +120,101 @@ int get_opcode(int instruction) {
 	return first;
 }
 
+//array -> ()
+//initializes the Caches to have values of -1 symbolizing an empty slot and intializes RAM to have the value of the index.
+void initialize_arrays(){
+for (int i =0; i < 100; i++){
+    RAM[i] = i;
+}
+
+for (int i = 0; i < 10; i++){
+cacheLevel1[i] = -1;
+cacheTagsl1[i] = -1;
+}
+
+for (int i = 0; i < 20; i++){
+    cacheLevel2[i] = -1;
+    cacheTagsl2[i] = -1;
+}
+}
+
+//int -> boolean
+//purpose: to check to see if an address exist in the L1 cache
+bool inCacheL1(int address){
+for(int i = 0; i < 10; i++){
+if (cacheTagsl1[i] == address){
+    return true;
+}
+}
+return false;
+}
+
+//int -> boolean
+//purpose: to check to see if an address exist in the L2 cache
+bool inCacheL2(int address){
+for(int i = 0; i < 20; i++){
+    if(cacheTagsl2[i] == address){
+        return true;
+    }
+}
+return false;
+}
+
+//int -> int
+//purpose: to fetch from cacheL1
+int getFromCacheL1(int address){
+    for (int i = 0; i < 10; i++){
+        if (cacheTagsl1[i] == address)
+        {
+        return cacheLevel1[i];
+        }
+    }
+}
+
+//int -> int
+//purpose: to fetch from CacheL2
+int getFromCacheL2(int address){
+        for (int i = 0; i < 20; i++){
+        if (cacheTagsl1[i] == address)
+        {
+        return cacheLevel1[i];
+        }
+    }
+}
+
+//Write to memory
+void writeMemory(int address, int value) {
+    RAM[address] = value;
+
+    // Check if the address exists in L1 or L2 and update
+    if (inCacheL1(address)) {
+        for (int i = 0; i < 10; i++) {
+            if (cacheTagsl1[i] == address) {
+                cacheLevel1[i] = value; // Update L1 cache
+            }
+        }
+    } else if (inCacheL2(address)) {
+        for (int i = 0; i < 20; i++) {
+            if (cacheTagsl2[i] == address) {
+                cacheLevel2[i] = value; // Update L2 cache
+            }
+        }
+    }
+}
+
+//read from memory
+int readMemory(int address) {
+ if (inCacheL1(address)) {
+return getFromCacheL1(address); //Cache hit – if in cache
+ }
+else if(inCacheL2(address)) {
+return getFromCacheL2(address);
+ }
+else{
+return RAM[address]; //cache miss – if not, get from RAM
+}
+}
+
 // execute based on operation code
 void executeInstruction(int instruction) {
 	int opcode = get_opcode(instruction);
@@ -136,24 +225,24 @@ void executeInstruction(int instruction) {
 		case ADD_operation:
 			// perform addition
 			prev = ACC;
-			ACC = prev + dataMemory[address];
-			printf("Adding: %d + %d = %d\n", prev, dataMemory[address], ACC);
+			ACC = prev + readMemory(address);
+			printf("Adding: %d + %d = %d\n", prev, readMemory(address), ACC);
 			break;
 		case SUB_operation:
 			// perform substraction
 			prev = ACC;
-			ACC = prev - dataMemory[address];
-			printf("Subtracting: %d - %d = %d\n", prev, dataMemory[address], ACC);
+			ACC = prev - readMemory(address);
+			printf("Subtracting: %d - %d = %d\n", prev, readMemory(address), ACC);
 			break;
 		case LOAD_operation:
 			// perform loading
-			ACC = dataMemory[address];
-			printf("Loading data in ACC: %d -> %d\n", dataMemory[address], ACC);
+			ACC = readMemory(address);
+			printf("Loading data in ACC: %d -> %d\n", readMemory(address), ACC);
 			break;
 		case STORE_operation:
 			// perform storing
-			dataMemory[address] = ACC;
-			printf("Storing data into memory from ACC: %d -> %d\n", ACC, dataMemory[address]);
+			writeMemory(address, ACC);
+			printf("Storing data into memory from ACC: %d -> %d\n", ACC, readMemory(address));
 			break;
 		default:
 			// Handle undefined/invalid opcodes
@@ -163,7 +252,7 @@ void executeInstruction(int instruction) {
 }
 
 int main() {
-	initialize_dataMemory();
+	initialize_arrays();
 	PC = 0;
 
 	signal(SIGALRM, checkForInterrupt);
