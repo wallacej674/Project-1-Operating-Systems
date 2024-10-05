@@ -219,29 +219,37 @@ void updateCache(int address, int value) {
 	int temp_address = cacheTagsl1[0];
 	int temp_value = cacheLevel1[0];
 
-	// this will bump the values in l1 up 1 slot
-	for (int i = 1; i < 10; i++) {
-		int bump_address = cacheLevel1[i];
-		int bump_value = cacheTagsl1[i];
 
-		cacheLevel1[i - 1] = bump_value;
+	//this will bump the values in l1 up 1 slot
+	for(int i = 1; i < 10; i++){
+		int bump_value = cacheLevel1[i];
+		int bump_address = cacheTagsl1[i];
+		
+
 		cacheTagsl1[i - 1] = bump_address;
+		cacheLevel1[i - 1] = bump_value;
+		
 	}
-	// removes these elements from the queue
+	//removes these elements from the queue
 	cacheLevel1[9] = -1;
 	cacheTagsl1[9] = -1;
-	// bumps all the elements in l2
-	for (int i = 1; i < 20; i++) {
-		int bump_address  = cacheLevel2[i];
-		int bump_value = cacheTagsl2[i];
+	//bumps all the elements in l2
+	for (int i = 1; i < 20; i++){
+		int bump_value = cacheLevel1[i];
+		int bump_address = cacheTagsl1[i];
+		
 
-		cacheLevel2[i - 1] = bump_value;
 		cacheTagsl1[i - 1] = bump_address;
+		cacheLevel1[i - 1] = bump_value;
 	}
 	// moves this element to the end of l2
 	cacheLevel2[19] = temp_value;
 	cacheTagsl2[19] = temp_address;
-	updateCache(address, value);
+
+	//adds the new value to cache L1
+	cacheTagsl1[9] = address;
+	cacheLevel1[9] = value;
+	printf("value stored in cache level 1: address: %d value: %d \n", address, value);
 }
 
 // int int --> void
