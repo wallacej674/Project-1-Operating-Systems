@@ -31,10 +31,6 @@ int savedIR;
 int statusRegister;
 int interruptFlag = 0; // flag to signal the interrupt
 
-//DMA Status
-#define DMA_READY 0
-#define DMA_BUSY 1
-#define DMA_COMPLETE 2
 
 typedef struct {
 	int* source;
@@ -95,10 +91,8 @@ void initiateDMA(int* source, int* destination, int size, pthread_t* dmaThread) 
     	params->size = DMAsize;
 
 	pthread_create(dmaThread, NULL, dmaTransfer, params);
-	
+
 	// CPU can continue with other tasks while transfer happens
-	//pthread_detach(dmaThread);
-	//free(params);
 }
 
 // void -> int
@@ -195,6 +189,70 @@ int getFromCacheL2(int address){
 	return -1;
 }
 
+
+
+//address, value -> ()
+//adds the value and address to the cache memory.
+void updateCache(int address, int value){
+	
+
+	if (inCacheL1(address)){
+		return;
+	}
+	else if(inCacheL2(address)){
+		return;
+	}
+	//space in cache 1
+	for(int i = 0; i < 10; i++){
+		if (cacheTagsl1[i] == -1){
+			cacheTagsl1[i] = address;
+			cacheLevel1[i] = value;
+			printf("value stored in cache level 1: address: %d value: %d \n", address, value);
+			return; 
+		}
+	}
+	//space in cache 2
+	for(int i = 0; i < 20; i++){
+		if (cacheTagsl2[i] == -1){
+			cacheTagsl2[i] = address;
+			cacheLevel2[i] = value;
+			printf("value stored in cache level 2: address: %d value: %d \n", address, value);
+			return;
+
+		}
+	}
+	// if no space then this should occur
+	printf("No space in either cache level removing values to make space...\n");
+	int temp_address = cacheTagsl1[0];
+	int temp_value = cacheLevel1[0];
+
+
+	//this will bump the values in l1 up 1 slot
+	for(int i = 1; i < 10; i++){
+		int bump_address = cacheLevel1[i];
+		int bump_value = cacheTagsl1[i];
+
+		cacheLevel1[i - 1] = bump_value;
+		cacheTagsl1[i - 1] = bump_address;
+	}
+	//removes these elements from the queue
+	cacheLevel1[9] = -1;
+	cacheTagsl1[9] = -1;
+	//bumps all the elements in l2
+	for (int i = 1; i < 20; i++){
+		int bump_address = cacheLevel2[i];
+		int bump_value = cacheTagsl2[i];
+
+		cacheLevel2[i - 1] = bump_value;
+		cacheTagsl2[i - 1] = bump_address;
+	}
+	// moves this element to the end of l2
+	cacheLevel2[19] = temp_value;
+	cacheTagsl2[19] = temp_address;
+	updateCache(address,value);
+
+}
+
 //Write to memory
 void writeMemory(int address, int value) {
     RAM[address] = value;
@@ -203,16 +261,17 @@ void writeMemory(int address, int value) {
     if (inCacheL1(address)) {
         for (int i = 0; i < 10; i++) {
             if (cacheTagsl1[i] == address) {
-                cacheLevel1[i] = value; // Update L1 cache
+                cacheLevel1[i] = value; 
             }
         }
     } else if (inCacheL2(address)) {
         for (int i = 0; i < 20; i++) {
             if (cacheTagsl2[i] == address) {
-                cacheLevel2[i] = value; // Update L2 cache
+                cacheLevel2[i] = value; 
             }
         }
     }
+	updateCache(address, value);
 }
 
 //read from memory
@@ -224,7 +283,9 @@ else if(inCacheL2(address)) {
 return getFromCacheL2(address);
  }
 else{
+updateCache(address, RAM[address]);
 return RAM[address]; //cache miss – if not, get from RAM
+
 }
 }
 
